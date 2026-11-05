@@ -18,8 +18,10 @@ class Nodo:
 
 # ===== CLASE GRAFO =====
 class Grafo:
-    def __init__(self):
+    def __init__(self, dirigido=False):
         self.nodos = {}
+        # Si es dirigido, la conexion solo va de origen a destino
+        self.dirigido = dirigido
 
     # ----- Agregar un nodo (si no existe) -----
     def agregar_nodo(self, nombre):
@@ -31,7 +33,8 @@ class Grafo:
         self.agregar_nodo(origen)
         self.agregar_nodo(destino)
         self.nodos[origen].vecinos[destino] = peso
-        self.nodos[destino].vecinos[origen] = peso
+        if not self.dirigido:
+            self.nodos[destino].vecinos[origen] = peso
 
     # ----- Leer Nodos.csv y armar el grafo -----
     def cargar_csv(self, ruta):
@@ -45,8 +48,10 @@ class Grafo:
                     peso = int(peso)
                 self.agregar_conexion(row["origen"], row["destino"], peso)
 
-    # ----- Algoritmo de Dijkstra (camino mas corto) -----
-    def dijkstra(self, inicio, destino):
+    # ----- Dijkstra: distancias minimas desde el nodo de inicio -----
+    def calcular_distancias(self, inicio, destino=None):
+        """Regresa (distancias, anteriores). Si no se da destino, calcula
+        la distancia minima a todos los nodos."""
         distancias = {}
         anteriores = {}
         visitados = set()
@@ -85,6 +90,12 @@ class Grafo:
                 if nueva_distancia < distancias[vecino]:
                     distancias[vecino] = nueva_distancia
                     anteriores[vecino] = nodo_actual
+
+        return distancias, anteriores
+
+    # ----- Algoritmo de Dijkstra (camino mas corto) -----
+    def dijkstra(self, inicio, destino):
+        distancias, anteriores = self.calcular_distancias(inicio, destino)
 
         # Si el destino no es alcanzable no hay camino
         if distancias[destino] == float("inf"):
