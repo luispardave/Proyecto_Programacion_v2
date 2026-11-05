@@ -20,13 +20,9 @@ def mostrar_resultado(grafo, inicio, destino, distancia, camino):
         return
 
     print("Recorrido completo:")
-    acumulado = 0
-    for i in range(len(camino) - 1):
-        origen = camino[i]
-        siguiente = camino[i + 1]
-        peso = grafo.nodos[origen].vecinos[siguiente]
-        acumulado += peso
-        print(f"  {i + 1}. {origen} -> {siguiente} | peso: {peso} "
+    tramos = grafo.recorrido(camino)
+    for i, (origen, siguiente, peso, acumulado) in enumerate(tramos, 1):
+        print(f"  {i}. {origen} -> {siguiente} | peso: {peso} "
               f"| acumulado: {acumulado}")
 
     print(f"Camino: {' -> '.join(camino)}")

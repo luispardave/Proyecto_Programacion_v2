@@ -2,11 +2,13 @@
 Titulo: io_handler
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 29/10/2026
-Descripcion: Recaba los inputs del usuario y los guarda en Nodos.csv
+Descripcion: Recaba y valida los inputs del usuario, maneja la lista de
+             conexiones y lee/guarda el formato CSV (Nodos.csv)
 """
 
 
 import csv
+import io
 import os
 
 # ===== CONFIGURACION DEL ARCHIVO CSV =====
@@ -22,6 +24,11 @@ class NodoInvalidoError(Exception):
 
 class PesoInvalidoError(Exception):
     """Se lanza cuando el peso no es un numero int o float mayor a 0."""
+    pass
+
+
+class ConexionInvalidaError(Exception):
+    """Se lanza cuando el origen y el destino de una conexion son iguales."""
     pass
 
 
@@ -50,6 +57,60 @@ def validar_peso(texto):
     if peso <= 0:
         raise PesoInvalidoError("El peso debe ser mayor a 0.")
     return peso
+
+
+# ===== VALIDACION: CONEXION ENTRE DOS NODOS DISTINTOS =====
+def validar_conexion(origen, destino):
+    """Lanza ConexionInvalidaError si el origen y el destino son iguales."""
+    if origen == destino:
+        raise ConexionInvalidaError(
+            "El origen y el destino no pueden ser iguales.")
+
+
+# ===== FORMATO: NUMEROS PARA MOSTRAR =====
+def formato_numero(numero):
+    """Muestra 4 en vez de 4.0 y el infinito como simbolo."""
+    if numero == float("inf"):
+        return "∞"
+    if float(numero).is_integer():
+        return str(int(numero))
+    return str(round(numero, 2))
+
+
+# ===== LISTA DE CONEXIONES: BUSCAR, AGREGAR Y ELIMINAR =====
+def buscar_conexion(conexiones, origen, destino, dirigido=False):
+    """Regresa la conexion entre origen y destino (o None). Si el grafo no
+    es dirigido, A-B y B-A son la misma conexion."""
+    for c in conexiones:
+        if c["origen"] == origen and c["destino"] == destino:
+            return c
+        if not dirigido and c["origen"] == destino and c["destino"] == origen:
+            return c
+    return None
+
+
+def agregar_conexion(conexiones, origen, destino, peso, dirigido=False):
+    """Agrega la conexion o actualiza su peso si ya existe.
+    Regresa True si es nueva y False si solo se actualizo."""
+    validar_conexion(origen, destino)
+    existente = buscar_conexion(conexiones, origen, destino, dirigido)
+    if existente:
+        existente["peso"] = peso
+        return False
+    conexiones.append({"origen": origen, "destino": destino, "peso": peso})
+    return True
+
+
+def quitar_nodo(conexiones, nombre):
+    """Regresa las conexiones sin las que tocan al nodo."""
+    return [c for c in conexiones if nombre not in (c["origen"], c["destino"])]
+
+
+def etiqueta_conexion(conexion, dirigido=False):
+    """Texto para mostrar una conexion, ej: 'A — B  (peso 4)'."""
+    flecha = "→" if dirigido else "—"
+    return (f"{conexion['origen']} {flecha} {conexion['destino']}  "
+            f"(peso {formato_numero(conexion['peso'])})")
 
 
 # ===== INPUT: PEDIR NODO =====
@@ -82,8 +143,10 @@ def pedir_conexiones():
         origen = pedir_nodo("Nodo origen: ")
         destino = pedir_nodo("Nodo destino: ")
 
-        if origen == destino:
-            print("Error: El origen y el destino no pueden ser iguales.")
+        try:
+            validar_conexion(origen, destino)
+        except ConexionInvalidaError as e:
+            print(f"Error: {e}")
             continue
 
         peso = pedir_peso()
@@ -111,10 +174,46 @@ def pedir_ruta(nodos):
 def guardar_csv(conexiones):
     """Guarda las conexiones en Nodos.csv (los errores se manejan en main)."""
     with open(RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=ENCABEZADOS)
-        writer.writeheader()
-        writer.writerows(conexiones)
+        escribir_csv(file, conexiones)
     print("Conexiones guardadas en Nodos.csv")
+
+
+# ===== CSV: ESCRIBIR CONEXIONES EN UN ARCHIVO O TEXTO =====
+def escribir_csv(destino, conexiones):
+    """Escribe encabezados y conexiones en un archivo abierto o StringIO."""
+    writer = csv.DictWriter(destino, fieldnames=ENCABEZADOS)
+    writer.writeheader()
+    writer.writerows(conexiones)
+
+
+def conexiones_a_texto(conexiones):
+    """Regresa las conexiones como texto CSV (para descargar)."""
+    salida = io.StringIO()
+    escribir_csv(salida, conexiones)
+    return salida.getvalue()
+
+
+# ===== CSV: LEER Y VALIDAR CONEXIONES DESDE TEXTO =====
+def leer_conexiones_texto(texto):
+    """Lee un CSV (origen,destino,peso) y regresa (nodos, conexiones).
+    Lanza KeyError si falta una columna o ValueError si una fila es
+    invalida."""
+    nodos = set()
+    conexiones = []
+    reader = csv.DictReader(io.StringIO(texto))
+    for num, row in enumerate(reader, start=2):
+        try:
+            origen = validar_nodo(row["origen"])
+            destino = validar_nodo(row["destino"])
+            validar_conexion(origen, destino)
+            peso = validar_peso(row["peso"])
+        except (NodoInvalidoError, PesoInvalidoError,
+                ConexionInvalidaError) as e:
+            raise ValueError(f"fila {num}: {e}")
+        nodos.update([origen, destino])
+        conexiones.append({"origen": origen, "destino": destino,
+                           "peso": peso})
+    return sorted(nodos), conexiones
 
 
 # ===== CSV: BORRAR REGISTRO DE Nodos.csv =====
@@ -122,8 +221,7 @@ def limpiar_csv():
     """Borra el registro de Nodos.csv dejando solo los encabezados."""
     try:
         with open(RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=ENCABEZADOS)
-            writer.writeheader()
+            escribir_csv(file, [])
         print("Registro de Nodos.csv borrado.")
     except PermissionError:
         print("Error: No hay permisos para limpiar Nodos.csv")

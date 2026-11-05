@@ -18,8 +18,10 @@ class Nodo:
 
 # ===== CLASE GRAFO =====
 class Grafo:
-    def __init__(self):
+    def __init__(self, dirigido=False):
         self.nodos = {}
+        # Si es dirigido, la conexion solo va de origen a destino
+        self.dirigido = dirigido
 
     # ----- Agregar un nodo (si no existe) -----
     def agregar_nodo(self, nombre):
@@ -31,7 +33,42 @@ class Grafo:
         self.agregar_nodo(origen)
         self.agregar_nodo(destino)
         self.nodos[origen].vecinos[destino] = peso
-        self.nodos[destino].vecinos[origen] = peso
+        if not self.dirigido:
+            self.nodos[destino].vecinos[origen] = peso
+
+    # ----- Armar el grafo desde listas de nodos y conexiones -----
+    @classmethod
+    def desde_listas(cls, nodos, conexiones, dirigido=False):
+        """Crea un Grafo con nodos sueltos y conexiones
+        [{"origen", "destino", "peso"}, ...]."""
+        grafo = cls(dirigido=dirigido)
+        for nombre in nodos:
+            grafo.agregar_nodo(nombre)
+        for c in conexiones:
+            grafo.agregar_conexion(c["origen"], c["destino"], c["peso"])
+        return grafo
+
+    # ----- Matriz de adyacencia -----
+    def matriz_adyacencia(self, orden=None):
+        """Regresa (orden, matriz) donde matriz[i][j] es el peso de ir del
+        nodo i al nodo j, o None si no hay conexion."""
+        orden = list(orden or sorted(self.nodos))
+        matriz = [[self.nodos[f].vecinos.get(c) for c in orden]
+                  for f in orden]
+        return orden, matriz
+
+    # ----- Recorrido tramo por tramo de un camino -----
+    def recorrido(self, camino):
+        """Regresa [(origen, siguiente, peso, acumulado), ...]."""
+        tramos = []
+        acumulado = 0
+        for i in range(len(camino) - 1):
+            origen = camino[i]
+            siguiente = camino[i + 1]
+            peso = self.nodos[origen].vecinos[siguiente]
+            acumulado += peso
+            tramos.append((origen, siguiente, peso, acumulado))
+        return tramos
 
     # ----- Leer Nodos.csv y armar el grafo -----
     def cargar_csv(self, ruta):
@@ -45,8 +82,10 @@ class Grafo:
                     peso = int(peso)
                 self.agregar_conexion(row["origen"], row["destino"], peso)
 
-    # ----- Algoritmo de Dijkstra (camino mas corto) -----
-    def dijkstra(self, inicio, destino):
+    # ----- Dijkstra: distancias minimas desde el nodo de inicio -----
+    def calcular_distancias(self, inicio, destino=None):
+        """Regresa (distancias, anteriores). Si no se da destino, calcula
+        la distancia minima a todos los nodos."""
         distancias = {}
         anteriores = {}
         visitados = set()
@@ -85,6 +124,12 @@ class Grafo:
                 if nueva_distancia < distancias[vecino]:
                     distancias[vecino] = nueva_distancia
                     anteriores[vecino] = nodo_actual
+
+        return distancias, anteriores
+
+    # ----- Algoritmo de Dijkstra (camino mas corto) -----
+    def dijkstra(self, inicio, destino):
+        distancias, anteriores = self.calcular_distancias(inicio, destino)
 
         # Si el destino no es alcanzable no hay camino
         if distancias[destino] == float("inf"):
