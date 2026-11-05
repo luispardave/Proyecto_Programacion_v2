@@ -36,6 +36,40 @@ class Grafo:
         if not self.dirigido:
             self.nodos[destino].vecinos[origen] = peso
 
+    # ----- Armar el grafo desde listas de nodos y conexiones -----
+    @classmethod
+    def desde_listas(cls, nodos, conexiones, dirigido=False):
+        """Crea un Grafo con nodos sueltos y conexiones
+        [{"origen", "destino", "peso"}, ...]."""
+        grafo = cls(dirigido=dirigido)
+        for nombre in nodos:
+            grafo.agregar_nodo(nombre)
+        for c in conexiones:
+            grafo.agregar_conexion(c["origen"], c["destino"], c["peso"])
+        return grafo
+
+    # ----- Matriz de adyacencia -----
+    def matriz_adyacencia(self, orden=None):
+        """Regresa (orden, matriz) donde matriz[i][j] es el peso de ir del
+        nodo i al nodo j, o None si no hay conexion."""
+        orden = list(orden or sorted(self.nodos))
+        matriz = [[self.nodos[f].vecinos.get(c) for c in orden]
+                  for f in orden]
+        return orden, matriz
+
+    # ----- Recorrido tramo por tramo de un camino -----
+    def recorrido(self, camino):
+        """Regresa [(origen, siguiente, peso, acumulado), ...]."""
+        tramos = []
+        acumulado = 0
+        for i in range(len(camino) - 1):
+            origen = camino[i]
+            siguiente = camino[i + 1]
+            peso = self.nodos[origen].vecinos[siguiente]
+            acumulado += peso
+            tramos.append((origen, siguiente, peso, acumulado))
+        return tramos
+
     # ----- Leer Nodos.csv y armar el grafo -----
     def cargar_csv(self, ruta):
         """Lee las conexiones de Nodos.csv (los errores se manejan en main)."""

@@ -2,10 +2,12 @@
 Titulo: estilos
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 05/11/2026
-Descripcion: Paletas de color (Light / Dark) y CSS de la web app
+Descripcion: Paletas de color (Light / Dark), CSS y acomodo visual de
+             los nodos en el lienzo de la web app
 """
 
 
+import math
 from string import Template
 
 
@@ -175,3 +177,17 @@ html, body, .stApp { font-family: 'Roboto', sans-serif; }
 def css(tema):
     """Regresa la hoja de estilos con los colores del tema elegido."""
     return _CSS.substitute(PALETAS[tema])
+
+
+# ===== LIENZO: ACOMODO INICIAL DE LOS NODOS =====
+def posiciones_circulares(nodos):
+    """Acomoda los nodos en circulo, empezando por la izquierda.
+    Regresa {nombre: (x, y)} (despues se pueden arrastrar)."""
+    n = len(nodos)
+    radio = max(160, 45 * n)
+    posiciones = {}
+    for i, nombre in enumerate(nodos):
+        angulo = math.pi + 2 * math.pi * i / max(n, 1)
+        posiciones[nombre] = (radio * math.cos(angulo),
+                              radio * math.sin(angulo))
+    return posiciones
