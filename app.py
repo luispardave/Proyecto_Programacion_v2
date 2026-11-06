@@ -10,6 +10,7 @@ Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
 """
 
 
+import copy
 from datetime import datetime
 
 import pandas as pd
@@ -40,42 +41,55 @@ EJEMPLO = [("A", "B", 4), ("A", "C", 2), ("B", "C", 2), ("B", "D", 1),
 ss = st.session_state
 
 
+# ===== ALMACEN EN MEMORIA (1 sola lectura de Nodos.csv) =====
+@st.cache_resource
+def almacen():
+    """Lee Nodos.csv UNA sola vez mientras el servidor de Streamlit este
+    encendido. El diccionario que regresa queda en memoria y se comparte
+    entre recargas (F5) y pestañas, asi el archivo no se vuelve a abrir."""
+    datos = {"nodos": [], "aristas": [], "error": None, "sin_guardar": False}
+    try:
+        datos["nodos"], datos["aristas"] = io_handler.cargar_grafo_csv()
+    except (ValueError, KeyError, OSError) as e:
+        datos["error"] = f"No se pudo leer Nodos.csv: {e}"
+    return datos
+
+
 # ===== ESTADO DE LA SESION =====
 def iniciar_estado():
-    """Crea las variables de la sesion la primera vez."""
+    """Crea las variables de la sesion la primera vez, copiando el grafo
+    desde el almacen en memoria (no desde el archivo)."""
+    datos = almacen()
     valores = {
-        "nodos": [],          # ["A", "B", ...]
-        "aristas": [],        # [{"origen", "destino", "peso"}, ...]
+        "nodos": copy.deepcopy(datos["nodos"]),      # ["A", "B", ...]
+        "aristas": copy.deepcopy(datos["aristas"]),  # [{origen, destino, peso}]
         "historial": [],      # recorridos ejecutados
         "resultado": None,    # ultimo Dijkstra ejecutado
         "dirigido": False,
         "tema": "Light",
     }
-    if "nodos" not in ss:
-        cargar_desde_csv(valores)
+    if "nodos" not in ss and datos["error"]:
+        st.toast(datos["error"], icon=":material/error:")
+        datos["error"] = None   # avisar solo una vez
     for clave, valor in valores.items():
         if clave not in ss:
             ss[clave] = valor
 
 
-def cargar_desde_csv(valores):
-    """Al abrir o recargar la pagina, recupera el grafo guardado en
-    Nodos.csv."""
-    try:
-        valores["nodos"], valores["aristas"] = io_handler.cargar_grafo_csv()
-    except (ValueError, KeyError, OSError) as e:
-        st.toast(f"No se pudo leer Nodos.csv: {e}", icon=":material/error:")
-
-
 def guardar_en_csv():
-    """Guarda el grafo actual en Nodos.csv para que no se pierda."""
+    """Escribe el grafo actual en Nodos.csv (solo al presionar el boton
+    'Guardar en Nodos.csv'). Regresa True si se guardo."""
     try:
         io_handler.guardar_grafo_csv(ss.nodos, ss.aristas)
     except PermissionError:
         avisar_error("No se pudo guardar Nodos.csv (¿está abierto en otro "
                      "programa?).")
+        return False
     except OSError as e:
         avisar_error(f"No se pudo guardar Nodos.csv: {e}")
+        return False
+    almacen()["sin_guardar"] = False
+    return True
 
 
 def grafo_actual():
@@ -84,10 +98,14 @@ def grafo_actual():
 
 
 def grafo_modificado():
-    """Al cambiar el grafo se guarda en Nodos.csv y el ultimo resultado
+    """Al cambiar el grafo se actualiza el almacen en memoria (para que
+    sobreviva a una recarga) sin tocar Nodos.csv, y el ultimo resultado
     deja de ser valido."""
     ss.resultado = None
-    guardar_en_csv()
+    datos = almacen()
+    datos["nodos"] = copy.deepcopy(ss.nodos)
+    datos["aristas"] = copy.deepcopy(ss.aristas)
+    datos["sin_guardar"] = True
 
 
 def avisar_error(error):
@@ -176,6 +194,11 @@ def cb_importar_csv():
     grafo_modificado()
     st.toast(f"Se cargaron {len(aristas)} conexiones.",
              icon=":material/check_circle:")
+
+
+def cb_guardar_csv():
+    if guardar_en_csv():
+        st.toast("Grafo guardado en Nodos.csv.", icon=":material/save:")
 
 
 def cb_ejecutar_dijkstra():
@@ -367,8 +390,9 @@ def seccion_tabla():
     with col_csv:
         st.markdown("**Importar / Exportar CSV**")
         st.caption(f"Columnas: {', '.join(io_handler.ENCABEZADOS)} (como "
-                   "Nodos.csv). Importar reemplaza el grafo actual. El grafo "
-                   "se guarda solo en Nodos.csv cada vez que cambia.")
+                   "Nodos.csv). Importar reemplaza el grafo actual. "
+                   "Nodos.csv se lee una sola vez al iniciar la app; los "
+                   "cambios se escriben solo con **Guardar en Nodos.csv**.")
         st.file_uploader("Archivo CSV", type="csv", key="csv_subido",
                          label_visibility="collapsed")
         c1, c2 = st.columns(2)
@@ -380,6 +404,10 @@ def seccion_tabla():
                            file_name="Nodos.csv", mime="text/csv",
                            icon=":material/download:",
                            disabled=not ss.nodos, width="stretch")
+        st.button("Guardar en Nodos.csv", on_click=cb_guardar_csv,
+                  type="primary", icon=":material/save:", width="stretch")
+        if almacen()["sin_guardar"]:
+            st.caption(":orange[Hay cambios sin guardar en Nodos.csv.]")
 
 
 # ===== SECCION 3: EJECUTAR DIJKSTRA =====
