@@ -23,6 +23,14 @@ PIEZA_DESTINO = "♜︎"    # Torre: el castillo al que se quiere llegar
 PIEZAS = ["♞︎", "♝︎", "♛︎", "♟︎"]  # resto de nodos
 FUENTE_LIENZO = "Cinzel, Georgia, serif"
 FUENTE_PIEZAS = "'Segoe UI Symbol', 'DejaVu Sans', 'Noto Sans Symbols2', serif"
+# Fuentes de Google: Cinzel (titulos), Cinzel Decorative (logo) y
+# EB Garamond (texto)
+FUENTES_URL = ("https://fonts.googleapis.com/css2?"
+               "family=Cinzel:wght@500;700"
+               "&family=Cinzel+Decorative:wght@700"
+               "&family=EB+Garamond:wght@400;500;600&display=swap")
+FUENTE_LIENZO_URL = ("https://fonts.googleapis.com/css2?"
+                     "family=Cinzel:wght@700&display=swap")
 VIS_NETWORK_JS = ("https://unpkg.com/vis-network@9.1.9/standalone/umd/"
                   "vis-network.min.js")
 
@@ -91,14 +99,15 @@ PALETAS = {
 # ===== CSS (se rellena con la paleta del tema activo) =====
 _CSS = Template("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cinzel+Decorative:wght@700&family=EB+Garamond:wght@400;500;600&display=swap');
+@import url('$fuentes_url');
 
 /* ----- Base: pergamino / piedra ----- */
 html, body, .stApp { font-family: 'EB Garamond', Georgia, serif; }
 .stApp {
     color: $texto;
     background:
-        radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .18)),
+        radial-gradient(ellipse at center, transparent 55%,
+                        rgba(0, 0, 0, .18)),
         $fondo;
 }
 [data-testid="stHeader"] { background: transparent; }
@@ -296,7 +305,8 @@ html, body, .stApp { font-family: 'EB Garamond', Georgia, serif; }
 /* Letras blancas en encabezados e indices (fondo tinto) */
 .stApp [data-testid="stTable"] th,
 .stApp [data-testid="stTable"] th * { color: #FFFFFF !important; }
-[data-testid="stTable"] td, [data-testid="stTable"] th { border-color: $borde; }
+[data-testid="stTable"] td,
+[data-testid="stTable"] th { border-color: $borde; }
 [data-testid="stTable"] tbody tr:nth-child(even) td { background: $fila_par; }
 
 /* ----- Avisos, separadores y notificaciones ----- */
@@ -323,7 +333,9 @@ hr {
 }
 .stApp .etiqueta { color: $texto_suave; font-style: italic; font-size: 1rem; }
 .stApp [data-testid="stMetricValue"],
-.stApp [data-testid="stMetricValue"] * { font-family: 'Cinzel', serif; color: $acento; }
+.stApp [data-testid="stMetricValue"] * {
+    font-family: 'Cinzel', serif; color: $acento;
+}
 </style>
 """)
 
@@ -331,7 +343,7 @@ hr {
 # ===== CSS DEL TEMA =====
 def css(tema):
     """Regresa la hoja de estilos con los colores del tema elegido."""
-    return _CSS.substitute(PALETAS[tema])
+    return _CSS.substitute(PALETAS[tema], fuentes_url=FUENTES_URL)
 
 
 # ===== LIENZO: ACOMODO INICIAL DE LOS NODOS =====
@@ -384,7 +396,7 @@ def arista_lienzo(origen, destino, peso, en_camino, paleta):
 
 _HTML_LIENZO = Template("""<!doctype html>
 <html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+<link href="$fuente_url" rel="stylesheet">
 <script src="$vis_js"></script>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; }
@@ -406,7 +418,8 @@ _HTML_LIENZO = Template("""<!doctype html>
   function dibujar() {
     if (typeof vis === "undefined") {
       document.body.innerHTML =
-        '<div id="error">No se pudo cargar vis-network (revisa tu conexión a internet).</div>';
+        '<div id="error">No se pudo cargar vis-network ' +
+        '(revisa tu conexión a internet).</div>';
       return;
     }
     new vis.Network(document.getElementById("tablero"), {
@@ -428,7 +441,8 @@ def html_lienzo(nodos, aristas, dirigido, paleta, alto):
     """HTML del tablero: casillas de ajedrez de fondo y el grafo encima
     (los nodos se pueden arrastrar)."""
     return _HTML_LIENZO.substitute(
-        paleta, vis_js=VIS_NETWORK_JS, alto=alto,
+        paleta, vis_js=VIS_NETWORK_JS, fuente_url=FUENTE_LIENZO_URL,
+        alto=alto,
         nodos=json.dumps(nodos, ensure_ascii=False),
         aristas=json.dumps(aristas, ensure_ascii=False),
         dirigido="true" if dirigido else "false")

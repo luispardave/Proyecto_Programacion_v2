@@ -2,7 +2,7 @@
 Titulo: app
 Nombre Completo: Luis Angel Pardave Garcia
 Fecha de creación: 05/11/2026
-Descripcion: Web app en Streamlit (ALGO-VISUALIZER) para crear un grafo,
+Descripcion: Web app en Streamlit (DIJKSTRA-VISUALIZER) para crear un grafo,
              verlo en un lienzo y ejecutar Dijkstra de forma visual.
              La logica vive en grafo.py, io_handler.py y estilos.py;
              este archivo solo arma la interfaz.
@@ -21,8 +21,8 @@ from grafo import Grafo
 from io_handler import formato_numero
 
 
-st.set_page_config(page_title="Algo-Visualizer", page_icon=":material/hub:",
-                   layout="wide")
+st.set_page_config(page_title="Dijkstra-Visualizer",
+                   page_icon=":material/hub:", layout="wide")
 
 # ===== SECCIONES DEL MENU =====
 SECCIONES = {
@@ -393,7 +393,8 @@ def seccion_dijkstra():
     c1.selectbox("Nodo de inicio", ss.nodos, key="ruta_inicio")
     c2.selectbox("Nodo de destino", ss.nodos, index=len(ss.nodos) - 1,
                  key="ruta_destino")
-    c3.button("Ejecutar Dijkstra", type="primary", icon=":material/play_arrow:",
+    c3.button("Ejecutar Dijkstra", type="primary",
+              icon=":material/play_arrow:",
               on_click=cb_ejecutar_dijkstra, width="stretch")
 
     resultado = ss.resultado
@@ -474,7 +475,7 @@ def main():
 
     # Barra lateral (menu)
     with st.sidebar:
-        st.markdown('<div class="titulo-app">♞<br>Algo-Visualizer</div>'
+        st.markdown('<div class="titulo-app">♞<br>Dijkstra-Visualizer</div>'
                     '<div class="lema-app">El camino más corto del reino'
                     '</div>', unsafe_allow_html=True)
         seccion = st.radio("Menú", list(SECCIONES), key="seccion",
@@ -483,7 +484,7 @@ def main():
 
     # Encabezado
     col_titulo, col_modo = st.columns([3, 1], vertical_alignment="center")
-    col_titulo.markdown('<div class="encabezado">⚜ <b>ALGO-VISUALIZER</b> '
+    col_titulo.markdown('<div class="encabezado">⚜ <b>DIJKSTRA-VISUALIZER</b> '
                         '// DIJKSTRA PATHFINDER ⚜<small>Traza rutas entre '
                         'las casillas de tu tablero</small></div>',
                         unsafe_allow_html=True)
