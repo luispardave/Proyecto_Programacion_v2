@@ -14,7 +14,6 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
-from streamlit_agraph import Config, Edge, Node, agraph
 
 import estilos
 import io_handler
@@ -27,11 +26,11 @@ st.set_page_config(page_title="Algo-Visualizer", page_icon=":material/hub:",
 
 # ===== SECCIONES DEL MENU =====
 SECCIONES = {
-    "crear": ":material/add_circle: 1. Crear Grafo",
-    "tabla": ":material/table_chart: 2. Matriz/Tabla",
-    "dijkstra": ":material/play_arrow: 3. Ejecutar Dijkstra",
-    "historial": ":material/history: 4. Historial",
-    "ajustes": ":material/settings: 5. Ajustes",
+    "crear": "♖  1. Crear Grafo",
+    "tabla": "♟  2. Matriz/Tabla",
+    "dijkstra": "♞  3. Ejecutar Dijkstra",
+    "historial": "♗  4. Historial",
+    "ajustes": "♔  5. Ajustes",
 }
 
 # Grafo de ejemplo (el del boceto)
@@ -52,9 +51,31 @@ def iniciar_estado():
         "dirigido": False,
         "tema": "Light",
     }
+    if "nodos" not in ss:
+        cargar_desde_csv(valores)
     for clave, valor in valores.items():
         if clave not in ss:
             ss[clave] = valor
+
+
+def cargar_desde_csv(valores):
+    """Al abrir o recargar la pagina, recupera el grafo guardado en
+    Nodos.csv."""
+    try:
+        valores["nodos"], valores["aristas"] = io_handler.cargar_grafo_csv()
+    except (ValueError, KeyError, OSError) as e:
+        st.toast(f"No se pudo leer Nodos.csv: {e}", icon=":material/error:")
+
+
+def guardar_en_csv():
+    """Guarda el grafo actual en Nodos.csv para que no se pierda."""
+    try:
+        io_handler.guardar_grafo_csv(ss.nodos, ss.aristas)
+    except PermissionError:
+        avisar_error("No se pudo guardar Nodos.csv (¿está abierto en otro "
+                     "programa?).")
+    except OSError as e:
+        avisar_error(f"No se pudo guardar Nodos.csv: {e}")
 
 
 def grafo_actual():
@@ -63,8 +84,10 @@ def grafo_actual():
 
 
 def grafo_modificado():
-    """Al cambiar el grafo, el ultimo resultado ya no es valido."""
+    """Al cambiar el grafo se guarda en Nodos.csv y el ultimo resultado
+    deja de ser valido."""
     ss.resultado = None
+    guardar_en_csv()
 
 
 def avisar_error(error):
@@ -189,14 +212,15 @@ def cb_reiniciar_todo():
 
 # ===== LIENZO DEL GRAFO =====
 def dibujar_lienzo(resultado=None, alto=470):
-    """Dibuja el grafo; si hay resultado resalta el camino y distancias."""
+    """Dibuja el grafo como piezas sobre un tablero; si hay resultado
+    resalta el camino y muestra las distancias."""
     c = estilos.PALETAS[ss.tema]
 
     with st.container(key="lienzo"):
-        st.markdown('<span class="lienzo-titulo">Graph Canvas</span>',
+        st.markdown('<span class="lienzo-titulo">♟ Tablero del grafo</span>',
                     unsafe_allow_html=True)
         if not ss.nodos:
-            st.info("El lienzo está vacío. Agrega nodos con el panel de la "
+            st.info("El tablero está vacío. Agrega nodos con el panel de la "
                     "derecha o carga el grafo de ejemplo.")
             st.button("Cargar grafo de ejemplo", on_click=cb_cargar_ejemplo,
                       icon=":material/auto_awesome:")
@@ -212,50 +236,39 @@ def dibujar_lienzo(resultado=None, alto=470):
 
         posiciones = estilos.posiciones_circulares(ss.nodos)
         lista_nodos = []
-        for nombre in ss.nodos:
+        for i, nombre in enumerate(ss.nodos):
             es_inicio = resultado is not None and nombre == resultado["inicio"]
-            en_camino = nombre in camino
-            etiqueta, titulo = nombre, nombre
+            es_destino = bool(camino) and nombre == resultado["destino"]
+            pieza = (estilos.PIEZA_INICIO if es_inicio else
+                     estilos.PIEZA_DESTINO if es_destino else
+                     estilos.pieza_de(i))
+            texto, titulo = nombre, f"Nodo {nombre}"
             if resultado:
                 dist = formato_numero(resultado["distancias"][nombre])
-                etiqueta = f"{nombre}\n{'START' if es_inicio else dist}"
-                titulo = f"dist: {dist}"
-            fondo = c["guinda"] if es_inicio else c["nodo_bg"]
-            borde = c["dorado"] if (es_inicio or en_camino) else c["nodo_borde"]
+                texto = f"{nombre} · {'Inicio' if es_inicio else dist}"
+                titulo = f"Nodo {nombre} · dist: {dist}"
+            color = (c["pieza_inicio"] if es_inicio else
+                     c["dorado"] if nombre in camino else c["pieza"])
             x, y = posiciones[nombre]
-            lista_nodos.append(Node(
-                id=nombre, label=etiqueta, title=titulo, shape="circle",
-                x=x, y=y, borderWidth=4 if en_camino else 3, margin=14,
-                color={"background": fondo, "border": borde,
-                       "highlight": {"background": fondo,
-                                     "border": c["dorado"]}},
-                font={"color": c["dorado"] if es_inicio else c["nodo_texto"],
-                      "size": 20, "face": "Roboto", "bold": True},
-            ))
+            lista_nodos.append(estilos.nodo_pieza(nombre, pieza, texto, titulo,
+                                                  color, x, y, c))
 
         lista_aristas = []
         for a in ss.aristas:
             en_camino = (a["origen"], a["destino"]) in tramos_camino
-            lista_aristas.append(Edge(
-                source=a["origen"], target=a["destino"],
-                label=formato_numero(a["peso"]),
-                color=c["dorado"] if en_camino else c["arista"],
-                width=5 if en_camino else 2, smooth=False,
-                font={"color": c["texto"], "size": 15, "face": "Roboto",
-                      "strokeWidth": 4, "strokeColor": c["lienzo"]},
-            ))
+            lista_aristas.append(estilos.arista_lienzo(
+                a["origen"], a["destino"], formato_numero(a["peso"]),
+                en_camino, c))
 
-        config = Config(height=alto, width=700, directed=ss.dirigido,
-                        physics=False,
-                        interaction={"dragNodes": True, "dragView": True,
-                                     "zoomView": True, "hover": True})
-        config.width = "100%"
-        if ss.dirigido:
-            config.edges = {"arrows": "to"}
-        agraph(nodes=lista_nodos, edges=lista_aristas, config=config)
+        # El HTML solo lleva datos validados (letras y numeros del grafo)
+        st.iframe(estilos.html_lienzo(lista_nodos, lista_aristas,
+                                      ss.dirigido, c, alto),
+                  height=alto)
 
-    st.caption("* Arrastra los nodos para acomodarlos. Usa la rueda del "
-               "mouse para hacer zoom.")
+    st.caption(f"{estilos.PIEZA_INICIO} inicio · {estilos.PIEZA_DESTINO} "
+               "destino · piezas y línea doradas: camino más corto. Arrastra "
+               "las piezas para acomodarlas y usa la rueda del mouse para "
+               "hacer zoom.")
 
 
 def titulo_panel(texto):
@@ -354,17 +367,19 @@ def seccion_tabla():
     with col_csv:
         st.markdown("**Importar / Exportar CSV**")
         st.caption(f"Columnas: {', '.join(io_handler.ENCABEZADOS)} (como "
-                   "Nodos.csv). Importar reemplaza el grafo actual.")
+                   "Nodos.csv). Importar reemplaza el grafo actual. El grafo "
+                   "se guarda solo en Nodos.csv cada vez que cambia.")
         st.file_uploader("Archivo CSV", type="csv", key="csv_subido",
                          label_visibility="collapsed")
         c1, c2 = st.columns(2)
         c1.button("Importar", on_click=cb_importar_csv,
                   icon=":material/upload:", width="stretch")
         c2.download_button("Exportar",
-                           io_handler.conexiones_a_texto(ss.aristas),
+                           io_handler.conexiones_a_texto(ss.aristas,
+                                                         ss.nodos),
                            file_name="Nodos.csv", mime="text/csv",
                            icon=":material/download:",
-                           disabled=not ss.aristas, width="stretch")
+                           disabled=not ss.nodos, width="stretch")
 
 
 # ===== SECCION 3: EJECUTAR DIJKSTRA =====
@@ -440,8 +455,8 @@ def seccion_ajustes():
               on_change=cb_cambiar_dirigido)
 
     st.markdown("**Tema**")
-    st.caption("Cambia entre Light y Dark con el selector de arriba a la "
-               "derecha.")
+    st.caption("Cambia entre Día (pergamino) y Noche (castillo) con el "
+               "selector de arriba a la derecha.")
 
     st.markdown("**Datos**")
     c1, c2, _ = st.columns([1, 1, 2])
@@ -459,22 +474,24 @@ def main():
 
     # Barra lateral (menu)
     with st.sidebar:
-        st.markdown('<div class="titulo-app">☰&nbsp; ALGO-VISUALIZER</div>',
-                    unsafe_allow_html=True)
+        st.markdown('<div class="titulo-app">♞<br>Algo-Visualizer</div>'
+                    '<div class="lema-app">El camino más corto del reino'
+                    '</div>', unsafe_allow_html=True)
         seccion = st.radio("Menú", list(SECCIONES), key="seccion",
                            format_func=SECCIONES.get,
                            label_visibility="collapsed")
 
     # Encabezado
     col_titulo, col_modo = st.columns([3, 1], vertical_alignment="center")
-    col_titulo.markdown('<div class="encabezado">[<b>ALGO-VISUALIZER</b> '
-                        '// DIJKSTRA PATHFINDER]</div>',
+    col_titulo.markdown('<div class="encabezado">⚜ <b>ALGO-VISUALIZER</b> '
+                        '// DIJKSTRA PATHFINDER ⚜<small>Traza rutas entre '
+                        'las casillas de tu tablero</small></div>',
                         unsafe_allow_html=True)
-    with col_modo:
+    with col_modo, st.container(key="modo"):
         c1, c2 = st.columns([1, 2], vertical_alignment="center")
         c1.markdown("Modos:")
-        c2.radio("Modo", ["Light", "Dark"], key="tema", horizontal=True,
-                 label_visibility="collapsed")
+        c2.radio("Modo", list(estilos.TEMAS), key="tema", horizontal=True,
+                 format_func=estilos.TEMAS.get, label_visibility="collapsed")
 
     # Contenido de la seccion elegida
     with st.container(key="tarjeta"):
