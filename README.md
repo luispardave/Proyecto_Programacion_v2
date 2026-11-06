@@ -1,4 +1,4 @@
-# ALGO-VISUALIZER // Dijkstra Pathfinder
+# DIJKSTRA-VISUALIZER // Dijkstra Pathfinder
 
 Web app en Streamlit para crear un grafo, verlo en un lienzo interactivo y
 calcular el camino más corto con el algoritmo de Dijkstra.

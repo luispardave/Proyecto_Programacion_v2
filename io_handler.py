@@ -202,7 +202,8 @@ def conexiones_a_texto(conexiones, nodos=()):
 # ===== CSV: PERSISTENCIA DEL GRAFO DE LA WEB APP =====
 def guardar_grafo_csv(nodos, conexiones, ruta=None):
     """Guarda todo el grafo (conexiones y nodos sueltos) en Nodos.csv."""
-    with open(ruta or RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
+    ruta = ruta or RUTA_CSV
+    with open(ruta, mode="w", newline="", encoding="utf-8") as file:
         escribir_csv(file, conexiones, nodos)
 
 
