@@ -76,6 +76,10 @@ class Grafo:
         with open(ruta, mode="r", encoding="utf-8") as file:
             reader = csv.DictReader(file)
             for row in reader:
+                # Fila sin destino ni peso = nodo sin conexiones
+                if not (row["destino"] or "").strip():
+                    self.agregar_nodo(row["origen"].strip())
+                    continue
                 peso = float(row["peso"])
                 # Conservar el peso como int si no tiene decimales
                 if peso.is_integer():

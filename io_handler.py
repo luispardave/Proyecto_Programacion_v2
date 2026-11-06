@@ -179,23 +179,48 @@ def guardar_csv(conexiones):
 
 
 # ===== CSV: ESCRIBIR CONEXIONES EN UN ARCHIVO O TEXTO =====
-def escribir_csv(destino, conexiones):
-    """Escribe encabezados y conexiones en un archivo abierto o StringIO."""
+def escribir_csv(destino, conexiones, nodos=()):
+    """Escribe encabezados y conexiones en un archivo abierto o StringIO.
+    Los nodos sin conexiones se guardan como 'A,,' (sin destino ni peso)."""
     writer = csv.DictWriter(destino, fieldnames=ENCABEZADOS)
     writer.writeheader()
     writer.writerows(conexiones)
+    conectados = {c["origen"] for c in conexiones} | {
+        c["destino"] for c in conexiones}
+    for nombre in nodos:
+        if nombre not in conectados:
+            writer.writerow({"origen": nombre, "destino": "", "peso": ""})
 
 
-def conexiones_a_texto(conexiones):
-    """Regresa las conexiones como texto CSV (para descargar)."""
+def conexiones_a_texto(conexiones, nodos=()):
+    """Regresa las conexiones (y nodos sueltos) como texto CSV."""
     salida = io.StringIO()
-    escribir_csv(salida, conexiones)
+    escribir_csv(salida, conexiones, nodos)
     return salida.getvalue()
+
+
+# ===== CSV: PERSISTENCIA DEL GRAFO DE LA WEB APP =====
+def guardar_grafo_csv(nodos, conexiones, ruta=None):
+    """Guarda todo el grafo (conexiones y nodos sueltos) en Nodos.csv."""
+    with open(ruta or RUTA_CSV, mode="w", newline="", encoding="utf-8") as file:
+        escribir_csv(file, conexiones, nodos)
+
+
+def cargar_grafo_csv(ruta=None):
+    """Lee Nodos.csv y regresa (nodos, conexiones). Si el archivo no
+    existe regresa listas vacias; si tiene datos invalidos lanza
+    ValueError o KeyError (ver leer_conexiones_texto)."""
+    ruta = ruta or RUTA_CSV
+    if not os.path.exists(ruta):
+        return [], []
+    with open(ruta, mode="r", encoding="utf-8-sig") as file:
+        return leer_conexiones_texto(file.read())
 
 
 # ===== CSV: LEER Y VALIDAR CONEXIONES DESDE TEXTO =====
 def leer_conexiones_texto(texto):
     """Lee un CSV (origen,destino,peso) y regresa (nodos, conexiones).
+    Una fila sin destino ni peso es un nodo sin conexiones.
     Lanza KeyError si falta una columna o ValueError si una fila es
     invalida."""
     nodos = set()
@@ -203,7 +228,11 @@ def leer_conexiones_texto(texto):
     reader = csv.DictReader(io.StringIO(texto))
     for num, row in enumerate(reader, start=2):
         try:
-            origen = validar_nodo(row["origen"])
+            origen = validar_nodo(row["origen"] or "")
+            if not (row["destino"] or "").strip() and \
+                    not (row["peso"] or "").strip():
+                nodos.add(origen)
+                continue
             destino = validar_nodo(row["destino"])
             validar_conexion(origen, destino)
             peso = validar_peso(row["peso"])
