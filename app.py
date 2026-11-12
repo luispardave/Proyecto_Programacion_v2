@@ -62,7 +62,7 @@ def iniciar_estado():
     datos = almacen()
     valores = {
         "nodos": copy.deepcopy(datos["nodos"]),      # ["A", "B", ...]
-        "aristas": copy.deepcopy(datos["aristas"]),  # [{origen, destino, peso}]
+        "aristas": copy.deepcopy(datos["aristas"]),  # [{origen, destino..}]
         "historial": [],      # recorridos ejecutados
         "resultado": None,    # ultimo Dijkstra ejecutado
         "dirigido": False,
